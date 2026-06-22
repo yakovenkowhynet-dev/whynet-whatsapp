@@ -1,14 +1,21 @@
 const express = require('express');
 const { google } = require('googleapis');
 const https = require('https');
+const crypto = require('crypto');
 const app = express();
 app.use(express.json());
 
-const VERIFY_TOKEN   = process.env.VERIFY_TOKEN;
-const SPREADSHEET_ID = process.env.SPREADSHEET_ID;
-const PIXEL_ID       = process.env.PIXEL_ID;
-const ACCESS_TOKEN   = process.env.ACCESS_TOKEN;
-const PORT           = process.env.PORT || 3000;
+const VERIFY_TOKEN    = process.env.VERIFY_TOKEN;
+const SPREADSHEET_ID  = process.env.SPREADSHEET_ID;
+const PIXEL_ID        = process.env.PIXEL_ID;
+const ACCESS_TOKEN    = process.env.ACCESS_TOKEN;
+const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
+const PORT            = process.env.PORT || 3000;
+
+function hashPhone(phone) {
+  const clean = phone.replace(/\D/g, '');
+  return crypto.createHash('sha256').update(clean).digest('hex');
+}
 
 async function getSheets() {
   const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
@@ -45,7 +52,7 @@ async function sendConversionEvent(lead) {
       event_time: Math.floor(Date.now() / 1000),
       action_source: 'other',
       user_data: {
-        ph: [lead.phone_hash],
+        ph: [hashPhone(lead.phone)],
         ctwa_clid: lead.ctwa_clid,
       },
       custom_data: {
@@ -103,11 +110,11 @@ app.post('/webhook', async (req, res) => {
 
   if (referral?.source_type === 'ad') {
     const lead = {
-      phone:      message.from,
-      ctwa_clid:  referral.ctwa_clid,
-      ad_id:      referral.source_id,
-      headline:   referral.headline || '',
-      timestamp:  message.timestamp,
+      phone:     message.from,
+      ctwa_clid: referral.ctwa_clid,
+      ad_id:     referral.source_id,
+      headline:  referral.headline || '',
+      timestamp: message.timestamp,
     };
 
     console.log('[CTWA LEAD]', lead);
